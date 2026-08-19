@@ -10,7 +10,7 @@ swapped out independently without affecting other purposes.
 | Purpose | Directory | Current model | Consumer | Scaling |
 |---|---|---|---|---|
 | Coding assistant backend | [`models/coding-agent`](models/coding-agent) | Qwen3-Coder-30B-A3B-Instruct (AWQ) | [opencode](https://opencode.ai) | Scale-to-zero |
-| Home Assistant conversation agent | [`models/home-assistant`](models/home-assistant) | Qwen3-8B (AWQ) | [Home Assistant](https://www.home-assistant.io/) via `extended_openai_conversation` | Always-on (low-latency voice) |
+| Home Assistant conversation agent | [`models/home-assistant`](models/home-assistant) | Qwen3-8B (AWQ) | [Home Assistant](https://www.home-assistant.io/) via `extended_openai_conversation` | Scale-to-zero (reverted from always-on — see its README) |
 
 ## Adding a new purpose
 

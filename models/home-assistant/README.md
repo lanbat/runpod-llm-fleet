@@ -10,13 +10,27 @@ plain `Qwen3ForCausalLM` architecture). Deliberately **not** the newer Qwen3.5 l
 "Why not Qwen3.5" below.
 
 Chosen for this purpose because:
-- Small enough to be cheap to run **always-on** (no cold-start latency), which matters
-  far more here than for `coding-agent`: HA is often driven by voice commands where a
-  user is waiting for a spoken reply.
+- Small and cheap to run — see "Scaling" below for why this ended up scale-to-zero
+  rather than the always-on deployment originally planned.
 - Reliable tool/function calling, verified against a simulated Home Assistant
   `HassTurnOn`-style tool call (correct entity name + area extracted, clean structured
   `tool_calls`, no reasoning leak).
-- Warm latency measured at ~2s consistently — see Verification below.
+- Warm latency measured at ~2s consistently once a worker is up.
+
+## Scaling: reverted from always-on to scale-to-zero (cost)
+
+Originally deployed with `workersMin=1` (always-on) specifically to eliminate
+cold-start latency on voice commands. In practice, always-on at the GPU tier this
+landed on (RTX 4090, ~$1.10/hr) works out to **~$792/month** if left running
+continuously — checked via RunPod's actual live billing (`currentSpendPerHr`), not an
+estimate. User decided that ongoing cost wasn't worth it and asked to stop it running
+constantly, so this now matches `coding-agent`'s pattern: `workersMin=0`,
+`idleTimeout=300` (5 min). Tradeoff accepted: the first voice command after 5+ min of
+no use will hit a cold start (untested exactly how long for this model/GPU combo — likely
+faster than `coding-agent`'s ~1-9min given the much smaller model and context window,
+but confirm before relying on it). If cold starts turn out to be a real problem in
+practice, the always-on config is simple to restore (`workersMin=1`) — just go in with
+eyes open on the ~$800/mo cost this time.
 
 ## Why not Qwen3.5 (the originally planned model)
 
@@ -51,12 +65,12 @@ tokens (no thinking overhead).
 
 - Endpoint id: `0y3ptl2r9oachs`
 - Template id: `xacv4b30xt`
-- `workersMin=1`, `workersMax=1` — **always-on**, unlike `coding-agent`'s scale-to-zero.
-  Costs continuously (check current RunPod pricing for the GPU tier actually allocated —
-  gpuTypeIds includes RTX 4090/L40/L40S/RTX A6000 as fallbacks for availability).
-- `MAX_MODEL_LEN=32768` — far more than HA needs (short turns + tool defs), but avoids
-  the long cold-start problem seen at very large context windows on `coding-agent`
-  (moot here anyway since this never scales to zero).
+- `workersMin=0`, `workersMax=1`, `idleTimeout=300` — scale-to-zero (see "Scaling"
+  above for why this isn't always-on despite the original plan). gpuTypeIds includes
+  RTX 4090/L40/L40S/RTX A6000 as fallbacks for availability.
+- `MAX_MODEL_LEN=32768` — far more than HA needs (short turns + tool defs), but small
+  enough that cold starts should stay reasonably fast for this model's size (confirm
+  actual cold-start time — not yet measured post-revert).
 - `TOOL_CALL_PARSER=hermes` (plain JSON tool calls — this model's native format, unlike
   `coding-agent`'s Qwen3-Coder which uses the `qwen3_coder` XML-style parser).
 
