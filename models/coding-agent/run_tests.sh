@@ -175,7 +175,7 @@ print(f'{max_repeat} {think_leaks}')
 
 # ---------- run ----------
 require_key
-echo "=== BDD regression suite: RunPod + opencode (Qwen3-32B) ==="
+echo "=== BDD regression suite: RunPod + opencode (Qwen3-Coder-30B) ==="
 echo
 feature_endpoint_availability; echo
 feature_openai_api_contract; echo
