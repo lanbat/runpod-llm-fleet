@@ -1,0 +1,117 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "runpod:qwen3-coder-30b",
+  "small_model": "runpod:qwen3-coder-30b",
+  "default_agent": "build",
+  "shell": "/bin/zsh",
+  "logLevel": "INFO",
+  "share": "disabled",
+  "autoupdate": false,
+  "snapshot": true,
+  "instructions": [],
+  "skills": {
+    "paths": [".opencode/skills"],
+    "urls": []
+  },
+  "references": {},
+  "agent": {
+    "build": {
+      "model": "runpod:qwen3-coder-30b",
+      "mode": "subagent",
+      "description": "Build agent with enhanced security"
+    }
+  },
+  "command": {},
+  "provider": {
+    "runpod": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "RunPod (Qwen3-Coder-30B)",
+      "options": {
+        "baseURL": "https://api.runpod.ai/v2/h8ins1a7nls350/openai/v1",
+        "apiKey": "{env:RUNPOD_API_KEY}",
+        "timeout": 600000,
+        "chunkTimeout": 180000
+      },
+      "models": {
+        "qwen3-coder-30b": {
+          "name": "Qwen3 Coder 30B-A3B (RunPod)",
+          "limit": {
+            "context": 262144,
+            "output": 32768
+          }
+        }
+      }
+    }
+  },
+  "disabled_providers": [],
+  "enabled_providers": ["runpod"],
+  "mcp": {},
+  "plugin": [],
+  "permission": {
+    "edit": "deny",
+    "bash": {
+      "cd *": "allow",
+      "ls *": "allow",
+      "pwd *": "allow",
+      "echo *": "allow",
+      "cat *": "allow",
+      "grep *": "allow",
+      "find *": "allow",
+      "python3 *": "allow",
+      "npm *": "allow",
+      "git *": "allow",
+      "docker *": "allow",
+      "*": "ask"
+    },
+    "external_directory": {
+      "/tmp/*": "allow",
+      "/tmp/opencode/*": "allow",
+      "./.opencode/*": "allow",
+      "./models/*": "allow",
+      "*": "deny"
+    }
+  },
+  "formatter": false,
+  "lsp": false,
+  "experimental": {
+    "primary_tools": ["edit"],
+    "mcp_timeout": 30000
+  },
+  "tool_output": {
+    "max_lines": 200,
+    "max_bytes": 8192
+  },
+  "compaction": {
+    "auto": true,
+    "tail_turns": 15
+  },
+  "security": {
+    "sandbox": {
+      "enabled": true,
+      "memory_limit_mb": 128,
+      "cpu_time_limit_seconds": 30,
+      "network_access": {
+        "allowed_hosts": [
+          "api.runpod.ai",
+          "localhost",
+          "127.0.0.1"
+        ],
+        "allow_all": false
+      },
+      "process_isolation": {
+        "enabled": true,
+        "seccomp_profile": "strict"
+      }
+    },
+    "resource_limits": {
+      "max_execution_time_seconds": 30,
+      "max_output_size_bytes": 1048576,
+      "max_memory_usage_mb": 128
+    },
+    "logging": {
+      "security_events": true,
+      "command_execution": true,
+      "permission_denied": true
+    }
+  }
+}
