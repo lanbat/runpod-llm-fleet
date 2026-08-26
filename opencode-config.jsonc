@@ -1,0 +1,71 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "sandbox": {
+    "enabled": true,
+    "memoryLimit": "512MB",
+    "cpuLimit": "25%",
+    "network": {
+      "allow": false,
+      "whitelist": [
+        "api.runpod.ai"
+      ]
+    },
+    "filesystem": {
+      "readOnly": [
+        "/usr",
+        "/lib",
+        "/bin"
+      ],
+      "allowWrite": [
+        "/tmp",
+        "~/.local/share/opencode"
+      ]
+    }
+  },
+  "security": {
+    "inputValidation": {
+      "strict": true,
+      "maxLength": 10000,
+      "allowedTypes": ["text"]
+    },
+    "resourceManagement": {
+      "maxExecutionTime": 30000,
+      "maxMemoryUsage": "256MB",
+      "maxProcessCount": 10
+    },
+    "processIsolation": {
+      "enabled": true,
+      "seccompProfile": "strict"
+    }
+  },
+  "logging": {
+    "level": "info",
+    "format": "json",
+    "include": [
+      "execution",
+      "security",
+      "resource"
+    ]
+  },
+  "provider": {
+    "runpod": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "RunPod (Qwen3-Coder-30B)",
+      "options": {
+        "baseURL": "https://api.runpod.ai/v2/h8ins1a7nls350/openai/v1",
+        "apiKey": "{env:RUNPOD_API_KEY}",
+        "timeout": 600000,
+        "chunkTimeout": 180000
+      },
+      "models": {
+        "qwen3-coder-30b": {
+          "name": "Qwen3 Coder 30B-A3B (RunPod)",
+          "limit": {
+            "context": 262144,
+            "output": 32768
+          }
+        }
+      }
+    }
+  }
+}
