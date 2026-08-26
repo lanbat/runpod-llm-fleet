@@ -77,6 +77,12 @@ Each LLM purpose has its own directory under `models/`:
    }
    ```
 
+## Configuring a new RunPod endpoint
+
+See [`docs/runpod-setup.md`](docs/runpod-setup.md) for standing up a new RunPod
+serverless endpoint from scratch (template + endpoint creation via the REST API) —
+needed when adding a new purpose to the fleet or rebuilding an existing endpoint.
+
 ## Running Tests
 
 Navigate to a specific model directory and run the test suite:
