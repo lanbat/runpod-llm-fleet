@@ -4,6 +4,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 GLOBAL_CONFIG="${HOME}/.config/opencode/opencode.jsonc"
+GLOBAL_RUNTIME="${HOME}/.config/opencode/opencode.json"
 
 echo "=== RunPod opencode setup ==="
 
@@ -17,6 +18,8 @@ echo "opencode $(opencode --version)"
 mkdir -p "${HOME}/.config/opencode"
 cp "$ROOT/opencode-config.jsonc" "$GLOBAL_CONFIG"
 echo "Installed $GLOBAL_CONFIG"
+cp "$ROOT/opencode-runtime.json" "$GLOBAL_RUNTIME"
+echo "Installed $GLOBAL_RUNTIME"
 
 "$ROOT/scripts/sync-runpod-key.sh"
 
@@ -38,6 +41,7 @@ opencode models runpod
 echo ""
 echo "Setup complete."
 echo "  Global provider config: $GLOBAL_CONFIG"
+echo "  Global runtime config:  $GLOBAL_RUNTIME"
 echo "  Project defaults:       $ROOT/.opencode/opencode.json"
 echo ""
 echo "Usage (scale-to-zero — first request after idle cold-starts the GPU, 1–5+ min):"

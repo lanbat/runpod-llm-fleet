@@ -129,6 +129,12 @@ OpenCode `timeout`/`chunkTimeout` are set high to tolerate this.
 Installed to `~/.config/opencode/opencode.jsonc` by `setup-opencode.sh` or
 `deploy-fleet.sh opencode`.
 
+### Global runtime (`opencode-runtime.json`)
+
+Installed to `~/.config/opencode/opencode.json` by `setup-opencode.sh`. Sets
+`default_agent: build`, disables the `plan` agent (`agent.plan.disable: true`),
+and configures compaction, permissions, and watcher ignores.
+
 | Option | Value | Notes |
 |--------|-------|-------|
 | `baseURL` | `https://api.runpod.ai/v2/h8ins1a7nls350/openai/v1` | Coding-agent endpoint |

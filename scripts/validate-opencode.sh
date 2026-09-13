@@ -42,7 +42,10 @@ if [ -f "$GLOBAL_RUNTIME" ]; then
   else
     fail "plan agent should be disabled in $GLOBAL_RUNTIME"
   fi
-  if opencode debug agent plan 2>&1 | grep -q "not found"; then
+  # opencode debug agent plan exits 1 when plan is disabled; with pipefail that
+  # falsifies a pipeline even when grep matches "not found".
+  plan_debug="$(opencode debug agent plan 2>&1 || true)"
+  if [[ "$plan_debug" == *"not found"* ]]; then
     pass "plan agent not loadable"
   else
     fail "plan agent is still enabled — prompts may hang in plan mode"
