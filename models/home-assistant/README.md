@@ -9,6 +9,11 @@
 plain `Qwen3ForCausalLM` architecture). Deliberately **not** the newer Qwen3.5 line — see
 "Why not Qwen3.5" below.
 
+**Re-validated Sep 2026** as the best bang-for-buck HA model: community benchmarks and
+HA-specific testing still favour Qwen3 8B for tool calling at low latency/cost. Larger
+models (14B+) add ~50% latency for marginal gains; specialized 0.6B HA distill models
+exist but lack general conversational flexibility. See `ha-integration.yaml` for HA wiring.
+
 Chosen for this purpose because:
 - Small and cheap to run — see "Scaling" below for why this ended up scale-to-zero
   rather than the always-on deployment originally planned.
@@ -64,7 +69,7 @@ tokens (no thinking overhead).
 ## Live RunPod resources
 
 - Endpoint id: `0y3ptl2r9oachs`
-- Template id: `xacv4b30xt`
+- Template id: `9meabjszeo`
 - `workersMin=0`, `workersMax=1`, `idleTimeout=300` — scale-to-zero (see "Scaling"
   above for why this isn't always-on despite the original plan). gpuTypeIds includes
   RTX 4090/L40/L40S/RTX A6000 as fallbacks for availability.
@@ -86,11 +91,10 @@ for any `/v1/chat/completions`-compatible server:
 - API key: your `RUNPOD_API_KEY`
 - Model: `qwen3-8b-ha`
 
-If the component exposes a "thinking"/reasoning toggle, it doesn't matter which way
-it's set — the server-side template patch forces thinking off unconditionally
-regardless of what the client sends (verified: explicitly requesting
-`chat_template_kwargs.enable_thinking: true` is still ignored, same as the coding-agent
-model — reran that same check here before shipping).
+Set `chat_template_kwargs: { enable_thinking: false }` in the component if it exposes
+that field (required on vLLM 0.29+; the v2.25.1 worker + `CUSTOM_CHAT_TEMPLATE` covers
+normal requests but explicit `enable_thinking: true` from a client can still re-enable
+thinking).
 
 ## Testing
 

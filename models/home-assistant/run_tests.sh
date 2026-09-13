@@ -28,7 +28,7 @@ feature_always_on_availability() {
     start=$(date +%s)
     resp=$(curl -sS "${BASE}/openai/v1/chat/completions" \
       -H "Authorization: Bearer $RUNPOD_API_KEY" -H "Content-Type: application/json" \
-      -d '{"model":"qwen3-8b-ha","messages":[{"role":"user","content":"Reply with exactly: pong"}],"max_tokens":20}')
+      -d '{"model":"qwen3-8b-ha","messages":[{"role":"user","content":"Reply with exactly: pong"}],"max_tokens":20,"chat_template_kwargs":{"enable_thinking":false}}')
     elapsed=$(( $(date +%s) - start ))
     content=$(echo "$resp" | python3 -c "import json,sys; print(json.load(sys.stdin)['choices'][0]['message'].get('content') or '')" 2>/dev/null)
     echo "  request $i: ${elapsed}s, content='$content'"
@@ -45,7 +45,7 @@ feature_openai_api_contract() {
 
   resp=$(curl -sS "${BASE}/openai/v1/chat/completions" \
     -H "Authorization: Bearer $RUNPOD_API_KEY" -H "Content-Type: application/json" \
-    -d '{"model":"qwen3-8b-ha","messages":[{"role":"user","content":"Reply with exactly: pong"}],"max_tokens":20}')
+    -d '{"model":"qwen3-8b-ha","messages":[{"role":"user","content":"Reply with exactly: pong"}],"max_tokens":20,"chat_template_kwargs":{"enable_thinking":false}}')
   content=$(echo "$resp" | python3 -c "import json,sys; d=json.load(sys.stdin)['choices'][0]['message']; print((d.get('content') or '').strip())" 2>/dev/null)
   reasoning=$(echo "$resp" | python3 -c "import json,sys; print(json.load(sys.stdin)['choices'][0]['message'].get('reasoning'))" 2>/dev/null)
   ctoks=$(echo "$resp" | python3 -c "import json,sys; print(json.load(sys.stdin)['usage']['completion_tokens'])" 2>/dev/null)
@@ -71,7 +71,7 @@ feature_tool_calling() {
   req=$(python3 -c "
 import json
 tools = [{'type':'function','function':{'name':'HassTurnOn','description':'Turns on/opens a device or entity','parameters':{'type':'object','properties':{'name':{'type':'string'},'area':{'type':'string'}},'required':['name']}}}]
-print(json.dumps({'model':'qwen3-8b-ha','messages':[{'role':'user','content':'Turn on the kitchen lights'}],'tools':tools,'tool_choice':'auto','max_tokens':200}))
+print(json.dumps({'model':'qwen3-8b-ha','messages':[{'role':'user','content':'Turn on the kitchen lights'}],'tools':tools,'tool_choice':'auto','max_tokens':200,'chat_template_kwargs':{'enable_thinking':False}}))
 ")
   resp=$(curl -sS "${BASE}/openai/v1/chat/completions" \
     -H "Authorization: Bearer $RUNPOD_API_KEY" -H "Content-Type: application/json" \

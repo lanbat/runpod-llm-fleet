@@ -1,0 +1,7 @@
+{
+  "workersMin": 0,
+  "workersMax": 1,
+  "idleTimeout": 600,
+  "scalerType": "QUEUE_DELAY",
+  "scalerValue": 4
+}

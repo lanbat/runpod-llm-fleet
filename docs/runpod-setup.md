@@ -63,6 +63,14 @@ Save the returned `id` — that's `templateId` for the next step.
 
 ## 2. Create the endpoint
 
+Create the endpoint with minimal scaling (or copy from an existing model's
+`endpoint-scaling.json`). Each model directory has an `endpoint-scaling.json` that is the
+**source of truth** for serverless scaling — apply it with
+`./scripts/deploy-fleet.sh scaling` (no template redeploy) or include it in
+`update_endpoint()` during a full deploy.
+
+Example for a new purpose (matches `models/home-assistant/endpoint-scaling.json`):
+
 ```bash
 curl -s "${AUTH[@]}" https://rest.runpod.io/v1/endpoints \
   -d '{
@@ -72,9 +80,20 @@ curl -s "${AUTH[@]}" https://rest.runpod.io/v1/endpoints \
     "workersMin": 0,
     "workersMax": 1,
     "idleTimeout": 300,
-    "scalerType": "QUEUE_DELAY"
+    "scalerType": "QUEUE_DELAY",
+    "scalerValue": 4
   }' | jq .
 ```
+
+Fleet defaults (`models/*/endpoint-scaling.json`):
+
+| Field | coding-agent | home-assistant | Effect |
+|-------|--------------|----------------|--------|
+| `workersMin` | `0` | `0` | Scale-to-zero — no GPU cost while idle |
+| `workersMax` | `1` | `1` | At most one worker |
+| `idleTimeout` | `600` | `300` | Seconds before idle worker shuts down |
+| `scalerType` | `QUEUE_DELAY` | `QUEUE_DELAY` | Scale up when queue delay exceeds threshold |
+| `scalerValue` | `4` | `4` | Queue-delay threshold (seconds) |
 
 Notes on the fields most worth tuning:
 
@@ -85,9 +104,18 @@ Notes on the fields most worth tuning:
 - `idleTimeout` trades cold-start frequency against idle cost — see the
   cold-start-vs-context-window tradeoff in `models/coding-agent/README.md` for how this
   interacts with `MAX_MODEL_LEN`.
+- First request after idle triggers RunPod cold start automatically (1–5+ min). No local
+  wake scripts — scaling lives in RunPod serverless endpoint settings.
+- **Cost control:** `workersMin=0` is the authoritative scale-to-zero setting (no GPU
+  billing while fully idle). Billing applies during startup, execution, and the
+  `idleTimeout` window after the last request. The REST API may return `workersStandby`
+  separately; it is not writable via REST PATCH and does not override `workersMin`.
 - List multiple `gpuTypeIds` as fallbacks for availability, not just one.
 - Save the returned `id` — that's the endpoint id used in the base URL
   (`https://api.runpod.ai/v2/<endpoint id>/...`) everywhere else in this repo.
+
+After creation, add `models/<purpose>/endpoint-scaling.json` and wire the endpoint id
+into `scripts/deploy-fleet.sh` so `./scripts/deploy-fleet.sh scaling` can sync it.
 
 ## 3. Verify it comes up healthy
 

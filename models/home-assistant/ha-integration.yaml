@@ -1,0 +1,16 @@
+# Home Assistant extended_openai_conversation settings
+# Install: https://github.com/jekalmin/extended_openai_conversation
+#
+# Model choice (Sep 2026): Qwen3-8B-AWQ remains the best bang-for-buck for HA —
+# strong Hermes tool calling, low GPU cost on scale-to-zero, fast cold starts vs
+# 14B+ alternatives. Qwen3.5 line avoided (vLLM ForConditionalGeneration issues).
+
+extended_openai_conversation:
+  base_url: https://api.runpod.ai/v2/0y3ptl2r9oachs/openai/v1
+  api_key: !secret runpod_api_key
+  model: qwen3-8b-ha
+  # Required on current vLLM workers — prevents thinking-mode latency/leak:
+  chat_template_kwargs:
+    enable_thinking: false
+  # Optional: trim history to stay within 32k context
+  # max_history_messages: 20

@@ -5,7 +5,7 @@ This repository contains configuration and test suites for LLMs hosted on RunPod
 ## Architecture
 
 Each LLM purpose has its own directory under `models/`:
-- `models/coding-agent` - Qwen3-Coder-30B-A3B-Instruct (AWQ)
+- `models/coding-agent` - Qwen3-Coder-Next (AWQ, qtum quant)
 - `models/home-assistant` - Qwen3-8B (AWQ)
 
 ## Installation Instructions
@@ -18,10 +18,8 @@ Each LLM purpose has its own directory under `models/`:
    - `sqlite3`
    - `npm` (for opencode)
 
-2. **Environment Variables**
-   ```bash
-   export RUNPOD_API_KEY="your-runpod-api-key-here"
-   ```
+2. **RunPod API key** — stored in `~/.config/envman/` (see
+   [`docs/opencode-setup.md`](docs/opencode-setup.md))
 
 ### Setup Steps
 
@@ -31,51 +29,15 @@ Each LLM purpose has its own directory under `models/`:
    cd runpod-llm-fleet
    ```
 
-2. **Install Dependencies**
+2. **Install OpenCode + fleet config**
    ```bash
-   # Install opencode (if needed)
    npm install -g @opencode/cli
-   
-   # Install required npm packages for opencode
-   cd ~/.config/opencode/
-   npm install
+   echo 'export RUNPOD_API_KEY="rpa_..."' > ~/.config/envman/RUNPOD.env
+   ./scripts/setup-opencode.sh
+   ./scripts/validate-opencode.sh
    ```
 
-3. **Configuration**
-   
-   Copy the configuration file to your opencode directory:
-   ```bash
-   mkdir -p ~/.config/opencode/
-   cp opencode-config.jsonc ~/.config/opencode/
-   ```
-   
-   Or create a new `opencode.jsonc` file with the following content:
-   ```jsonc
-   {
-     "$schema": "https://opencode.ai/config.json",
-     "provider": {
-       "runpod": {
-         "npm": "@ai-sdk/openai-compatible",
-         "name": "RunPod (Qwen3-Coder-30B)",
-         "options": {
-           "baseURL": "https://api.runpod.ai/v2/h8ins1a7nls350/openai/v1",
-           "apiKey": "{env:RUNPOD_API_KEY}",
-           "timeout": 600000,
-           "chunkTimeout": 180000
-         },
-         "models": {
-           "qwen3-coder-30b": {
-             "name": "Qwen3 Coder 30B-A3B (RunPod)",
-             "limit": {
-               "context": 262144,
-               "output": 32768
-             }
-           }
-         }
-       }
-     }
-   }
-   ```
+   Full documentation: [`docs/opencode-setup.md`](docs/opencode-setup.md)
 
 ## Configuring a new RunPod endpoint
 
@@ -96,12 +58,24 @@ cd models/coding-agent
 
 | Purpose | Directory | Current Model | Consumer | Scaling |
 |---------|-----------|---------------|----------|---------|
-| Coding assistant backend | `models/coding-agent` | Qwen3-Coder-30B-A3B-Instruct (AWQ) | opencode | Scale-to-zero |
+| Coding assistant backend | `models/coding-agent` | Qwen3-Coder-Next (AWQ) | opencode | Scale-to-zero |
 | Home Assistant conversation agent | `models/home-assistant` | Qwen3-8B (AWQ) | Home Assistant | Scale-to-zero |
+
+### Deploy / refresh endpoints
+
+```bash
+export RUNPOD_API_KEY=<key>
+./scripts/deploy-fleet.sh all      # deploy both + install opencode config + test
+./scripts/deploy-fleet.sh coding   # coding endpoint only
+./scripts/deploy-fleet.sh verify   # smoke-test without redeploying
+```
 
 ## Important Notes
 
 - The RunPod endpoints are specific to this setup and may require different API keys
 - All model test suites cost small amounts of RunPod GPU time
-- The `RUNPOD_API_KEY` must be exported in your shell or environment
+- **OpenCode** reads the API key from `~/.config/envman/RUNPOD.key` (not shell env) —
+  see [`docs/opencode-setup.md`](docs/opencode-setup.md#api-key-why-a-file-not-an-env-var)
+- Shell scripts (`deploy-fleet.sh`, `run_tests.sh`) use `RUNPOD_API_KEY` from the
+  environment or `~/.config/envman/RUNPOD.env`
 - For debugging agent behavior, check `~/.local/share/opencode/opencode.db`

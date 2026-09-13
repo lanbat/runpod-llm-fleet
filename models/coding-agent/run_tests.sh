@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Executable BDD step implementations for features/*.feature.
-# Requires: RUNPOD_API_KEY exported, opencode + sqlite3 + python3 on PATH.
+# Requires: RUNPOD_API_KEY (env or ~/.config/envman/RUNPOD.env), opencode key file,
+# opencode + sqlite3 + python3 on PATH.
 set -u
 
 ENDPOINT_ID="h8ins1a7nls350"
@@ -14,10 +15,37 @@ pass() { echo "  PASS: $1"; PASS=$((PASS+1)); }
 fail() { echo "  FAIL: $1"; FAIL=$((FAIL+1)); }
 
 require_key() {
+  if [ -z "${RUNPOD_API_KEY:-}" ] && [ -f "$HOME/.config/envman/RUNPOD.env" ]; then
+    # shellcheck disable=SC1091
+    source "$HOME/.config/envman/RUNPOD.env"
+  fi
+  if [ -z "${RUNPOD_API_KEY:-}" ] && [ -f "$HOME/.config/envman/RUNPOD.key" ]; then
+    RUNPOD_API_KEY="$(cat "$HOME/.config/envman/RUNPOD.key")"
+  fi
   if [ -z "${RUNPOD_API_KEY:-}" ]; then
-    echo "RUNPOD_API_KEY is not set in this shell. Export it first." >&2
+    echo "RUNPOD_API_KEY is not set. Export it or run ./scripts/sync-runpod-key.sh" >&2
     exit 1
   fi
+}
+
+require_opencode_key_file() {
+  local key_file="$HOME/.config/envman/RUNPOD.key"
+  if [ ! -f "$key_file" ]; then
+    fail "Scenario: ~/.config/envman/RUNPOD.key missing (run ./scripts/sync-runpod-key.sh)"
+    return 1
+  fi
+  local http_code
+  http_code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 \
+    "${BASE}/health" -H "Authorization: Bearer $(cat "$key_file")" || echo "000")
+  if [ "$http_code" = "401" ]; then
+    fail "Scenario: opencode key file returns 401 Unauthorized"
+    return 1
+  fi
+  if [ "$http_code" != "200" ]; then
+    fail "Scenario: RunPod health check returned HTTP $http_code"
+    return 1
+  fi
+  pass "Scenario: opencode key file authenticates to RunPod (HTTP $http_code)"
 }
 
 # ---------- Feature: endpoint_availability ----------
@@ -30,7 +58,7 @@ feature_endpoint_availability() {
   start=$(date +%s)
   resp=$(curl -sS "${BASE}/openai/v1/chat/completions" \
     -H "Authorization: Bearer $RUNPOD_API_KEY" -H "Content-Type: application/json" \
-    -d '{"model":"qwen3-coder-30b","messages":[{"role":"user","content":"Reply with exactly: pong"}],"max_tokens":20}')
+    -d '{"model":"qwen3-coder-next","messages":[{"role":"user","content":"Reply with exactly: pong"}],"max_tokens":20}')
   elapsed=$(( $(date +%s) - start ))
 
   content=$(echo "$resp" | python3 -c "import json,sys; print(json.load(sys.stdin)['choices'][0]['message'].get('content') or '')" 2>/dev/null)
@@ -54,7 +82,7 @@ feature_openai_api_contract() {
 
   resp=$(curl -sS "${BASE}/openai/v1/chat/completions" \
     -H "Authorization: Bearer $RUNPOD_API_KEY" -H "Content-Type: application/json" \
-    -d '{"model":"qwen3-coder-30b","messages":[{"role":"user","content":"Reply with exactly: pong"}],"max_tokens":20}')
+    -d '{"model":"qwen3-coder-next","messages":[{"role":"user","content":"Reply with exactly: pong"}],"max_tokens":20}')
   content=$(echo "$resp" | python3 -c "import json,sys; d=json.load(sys.stdin)['choices'][0]['message']; print((d.get('content') or '').strip())" 2>/dev/null)
   reasoning=$(echo "$resp" | python3 -c "import json,sys; print(json.load(sys.stdin)['choices'][0]['message'].get('reasoning'))" 2>/dev/null)
   ctoks=$(echo "$resp" | python3 -c "import json,sys; print(json.load(sys.stdin)['usage']['completion_tokens'])" 2>/dev/null)
@@ -66,7 +94,7 @@ feature_openai_api_contract() {
   # explicit re-enable attempt
   resp2=$(curl -sS "${BASE}/openai/v1/chat/completions" \
     -H "Authorization: Bearer $RUNPOD_API_KEY" -H "Content-Type: application/json" \
-    -d '{"model":"qwen3-coder-30b","messages":[{"role":"user","content":"Reply with exactly: pong"}],"max_tokens":50,"chat_template_kwargs":{"enable_thinking":true}}')
+    -d '{"model":"qwen3-coder-next","messages":[{"role":"user","content":"Reply with exactly: pong"}],"max_tokens":50,"chat_template_kwargs":{"enable_thinking":true}}')
   content2=$(echo "$resp2" | python3 -c "import json,sys; d=json.load(sys.stdin)['choices'][0]['message']; print((d.get('content') or '').strip())" 2>/dev/null)
   has_think=$(echo "$resp2" | grep -c '<think>' || true)
 
@@ -78,12 +106,14 @@ feature_openai_api_contract() {
 feature_opencode_integration() {
   echo "Feature: opencode integration"
 
-  models_out=$(opencode models runpod 2>&1)
-  echo "$models_out" | grep -q "runpod/qwen3-coder-30b" \
-    && pass "Scenario: opencode lists runpod/qwen3-coder-30b" \
-    || fail "Scenario: opencode lists runpod/qwen3-coder-30b (got: $models_out)"
+  require_opencode_key_file || return
 
-  run_out=$(opencode run --model runpod/qwen3-coder-30b "Write a one-line python function that adds two numbers. Just the code, no explanation." 2>&1)
+  models_out=$(opencode models runpod 2>&1)
+  echo "$models_out" | grep -q "runpod/qwen3-coder-next" \
+    && pass "Scenario: opencode lists runpod/qwen3-coder-next" \
+    || fail "Scenario: opencode lists runpod/qwen3-coder-next (got: $models_out)"
+
+  run_out=$(opencode run --model runpod/qwen3-coder-next "Write a one-line python function that adds two numbers. Just the code, no explanation." 2>&1)
   rc=$?
   if [ $rc -eq 0 ] && echo "$run_out" | grep -Eq "def |lambda"; then
     pass "Scenario: opencode one-shot prompt succeeds and returns python code"
@@ -100,7 +130,7 @@ feature_repo_awareness() {
   marker="UNIQUE_MARKER_$(date +%s)_$$"
   printf '# %s\ndef compute_total(items):\n    return sum(item.price for item in items)\n' "$marker" > "$tmpdir/marker.py"
 
-  out=$(cd "$tmpdir" && opencode run --model runpod/qwen3-coder-30b "Read the file at exactly this path: $tmpdir/marker.py -- then quote its marker comment exactly." 2>&1)
+  out=$(cd "$tmpdir" && opencode run --model runpod/qwen3-coder-next "Read the file at exactly this path: $tmpdir/marker.py -- then quote its marker comment exactly." 2>&1)
   rm -rf "$tmpdir"
 
   echo "$out" | grep -q "$marker" \
@@ -123,7 +153,7 @@ feature_agentic_stability() {
   printf 'value_b = 2\n' > "$tmpdir/b/config.txt"
 
   before_ts=$(python3 -c "import time; print(int(time.time()*1000))")
-  cd "$tmpdir" && opencode run --model runpod/qwen3-coder-30b \
+  cd "$tmpdir" && opencode run --model runpod/qwen3-coder-next \
     "Read exactly these two files and tell me both values: $tmpdir/a/config.txt and $tmpdir/b/config.txt" > /tmp/agentic_stability_out.txt 2>&1
   cd - > /dev/null
   rm -rf "$tmpdir"
@@ -175,7 +205,7 @@ print(f'{max_repeat} {think_leaks}')
 
 # ---------- run ----------
 require_key
-echo "=== BDD regression suite: RunPod + opencode (Qwen3-Coder-30B) ==="
+echo "=== BDD regression suite: RunPod + opencode (Qwen3-Coder-Next) ==="
 echo
 feature_endpoint_availability; echo
 feature_openai_api_contract; echo

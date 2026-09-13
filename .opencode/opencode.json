@@ -1,54 +1,59 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "runpod:qwen3-coder-30b",
-  "small_model": "runpod:qwen3-coder-30b",
+  "model": "runpod/qwen3-coder-next",
+  "small_model": "runpod/qwen3-coder-next",
   "default_agent": "build",
   "shell": "/bin/zsh",
   "logLevel": "INFO",
   "share": "disabled",
   "autoupdate": false,
   "snapshot": true,
-  "instructions": [],
+  "instructions": ["../../.opencode/instructions.md"],
   "skills": {
-    "paths": [".opencode/skills"],
+    "paths": [],
     "urls": []
   },
   "references": {},
   "agent": {
+    "plan": {
+      "disable": true
+    },
     "build": {
-      "model": "runpod:qwen3-coder-30b",
-      "mode": "subagent",
-      "description": "Build agent using RunPod-hosted Qwen3 Coder"
+      "model": "runpod/qwen3-coder-next",
+      "description": "Build agent using RunPod-hosted Qwen3 Coder Next"
     }
   },
   "command": {},
   "disabled_providers": [],
-  "enabled_providers": ["runpod", "anthropic"],
+  "enabled_providers": ["runpod"],
   "mcp": {},
-  "plugin": ["opencode-claude-auth@latest"],
+  "plugin": [],
   "permission": {
     "edit": "allow",
     "bash": "allow",
+    "plan_enter": "deny",
+    "plan_exit": "deny",
+    "doom_loop": "ask",
     "external_directory": {
       "/tmp/*": "allow",
-      "/private/tmp/*": "allow",
-      "/var/folders/*": "allow",
-      "/private/var/folders/*": "allow",
+      "/home/traph/projects/**": "allow",
+      "/home/traph/.local/share/opencode/**": "allow",
       "*": "ask"
     }
   },
   "formatter": false,
   "lsp": false,
-  "experimental": {
-    "primary_tools": ["edit"],
-    "mcp_timeout": 30000
-  },
   "tool_output": {
-    "max_lines": 200,
-    "max_bytes": 8192
+    "max_lines": 500,
+    "max_bytes": 32768
   },
   "compaction": {
     "auto": true,
-    "tail_turns": 15
+    "prune": true,
+    "tail_turns": 15,
+    "reserved": 16000
+  },
+  "watcher": {
+    "ignore": ["**/.opencode/node_modules/**", "**/node_modules/**", "**/.git/**"]
   }
 }

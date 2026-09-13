@@ -41,8 +41,11 @@ both must match whatever's currently deployed — update both together if a mode
 
 ## `RUNPOD_API_KEY`
 
-Expected to be exported in the user's `~/.zshrc` (used by opencode, any other client,
-and every model's `run_tests.sh`).
+- **Shell scripts** (`deploy-fleet.sh`, `run_tests.sh`): expect `RUNPOD_API_KEY` exported
+  or in `~/.config/envman/RUNPOD.env`.
+- **OpenCode**: reads `~/.config/envman/RUNPOD.key` via `{file:...}` in
+  `~/.config/opencode/opencode.jsonc` — **not** the shell env var. Sync with
+  `./scripts/sync-runpod-key.sh`. Full guide: `docs/opencode-setup.md`.
 
 ## Before deploying a very recently released model (important, learned the hard way — twice)
 
