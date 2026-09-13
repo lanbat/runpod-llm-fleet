@@ -28,6 +28,30 @@ health() {
     -H "Authorization: Bearer $RUNPOD_API_KEY"
 }
 
+is_wedged() {
+  local h running ready
+  h=$(health)
+  running=$(echo "$h" | jq -r '.workers.running // 0')
+  ready=$(echo "$h" | jq -r '.workers.ready // 0')
+  # running:1 ready:0 with no idle worker — sync route hangs, jobs stay IN_QUEUE
+  [ "$running" != "0" ] && [ "$ready" = "0" ]
+}
+
+cycle_workers() {
+  local api="https://rest.runpod.io/v1/endpoints/${ENDPOINT_ID}"
+  local scaling_file="$ROOT/models/coding-agent/endpoint-scaling.json"
+  echo "Cycling workers (workersMax 0 → 1) to clear wedged pod..."
+  curl -sS -X PATCH "$api" \
+    -H "Authorization: Bearer $RUNPOD_API_KEY" \
+    -H "Content-Type: application/json" \
+    -d '{"workersMax":0}' | jq -r '.workersMax // "patched"' | xargs -I{} echo "  workersMax={}"
+  sleep 20
+  curl -sS -X PATCH "$api" \
+    -H "Authorization: Bearer $RUNPOD_API_KEY" \
+    -H "Content-Type: application/json" \
+    -d "$(jq -c '.' "$scaling_file")" | jq -r '.workersMax // "patched"' | xargs -I{} echo "  workersMax={}"
+}
+
 warmup_sync() {
   local base="https://api.runpod.ai/v2/${ENDPOINT_ID}/openai/v1/chat/completions"
   local attempt resp content
@@ -60,11 +84,23 @@ purge=$(curl -sS -X POST "https://api.runpod.ai/v2/${ENDPOINT_ID}/purge-queue" \
   -H "Authorization: Bearer $RUNPOD_API_KEY")
 echo "  $purge"
 
-echo "Waiting for ready worker..."
-for i in $(seq 1 30); do
-  ready=$(health | jq -r '.workers.ready // 0')
-  echo "  poll $i: ready=$ready"
-  [ "$ready" != "0" ] && break
+if is_wedged; then
+  echo "Worker wedged (running>0, ready=0) — cycling capacity..."
+  cycle_workers
+fi
+
+echo "Waiting for worker (cold start can take several minutes)..."
+for i in $(seq 1 40); do
+  h=$(health)
+  ready=$(echo "$h" | jq -r '.workers.ready // 0')
+  running=$(echo "$h" | jq -r '.workers.running // 0')
+  idle=$(echo "$h" | jq -r '.workers.idle // 0')
+  echo "  poll $i: ready=$ready running=$running idle=$idle"
+  [ "$ready" != "0" ] || [ "$idle" != "0" ] && break
+  if is_wedged && [ "$i" -eq 20 ]; then
+    echo "  still wedged after 5 min — cycling workers again..."
+    cycle_workers
+  fi
   sleep 15
 done
 

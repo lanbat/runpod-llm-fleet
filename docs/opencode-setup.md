@@ -235,13 +235,18 @@ OpenCode expects slash-separated model ids (`runpod/qwen3-coder-next`), not colo
 
 This is usually **RunPod**, not OpenCode config:
 
-1. **Run recovery** (stops opencode, purges queue, warms endpoint):
+1. **Run recovery** (stops opencode, purges queue, cycles wedged workers, warms endpoint):
    ```bash
    ./scripts/runpod-recover.sh
    ```
 2. **Only one opencode instance** — multiple TUI sessions multiply queued requests.
 3. **Do not resume old sessions** — use `/new` or quit and restart `opencode`.
-4. Check queue: `curl -s .../health | jq .jobs` — if `inQueue` > 0, run recover script.
+4. Check health: `curl -s .../health | jq .workers` — if `running:1` and `ready:0` for
+   more than a few minutes, the worker is wedged. Run recover script.
+
+**Wedged worker symptom:** health shows `running:1, ready:0` (sometimes `idle:0`); sync
+`/openai/v1/chat/completions` hangs; async jobs stay `IN_QUEUE`. Recovery cycles capacity
+(`workersMax` 0 → 1 via RunPod REST API) to kill the stuck pod, then cold-starts fresh.
 
 **Root cause:** scale-to-zero + RunPod's sync `/openai/v1/chat/completions` route often
 hangs on the first 1–2 requests after a worker becomes `ready`. Stuck opencode sessions

@@ -16,11 +16,15 @@
   "references": {},
   "agent": {
     "plan": {
-      "disable": false
+      "disable": true
     },
     "build": {
       "model": "runpod/qwen3-coder-next",
-      "description": "Build agent using RunPod-hosted Qwen3 Coder Next"
+      "description": "Build agent using RunPod-hosted Qwen3 Coder Next",
+      "permission": {
+        "plan_enter": "deny",
+        "plan_exit": "deny"
+      }
     }
   },
   "command": {},
@@ -31,8 +35,8 @@
   "permission": {
     "edit": "allow",
     "bash": "allow",
-    "plan_enter": "allow",
-    "plan_exit": "allow",
+    "plan_enter": "deny",
+    "plan_exit": "deny",
     "doom_loop": "ask",
     "external_directory": {
       "/tmp/*": "allow",

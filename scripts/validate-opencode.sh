@@ -32,23 +32,20 @@ fi
 GLOBAL_RUNTIME="${HOME}/.config/opencode/opencode.json"
 if [ -f "$GLOBAL_RUNTIME" ]; then
   pass "global runtime config exists ($GLOBAL_RUNTIME)"
-  if grep -q '"default_agent": "build"' "$GLOBAL_RUNTIME"; then
-    pass "default agent is build (not plan)"
-  else
-    fail "default_agent should be build in $GLOBAL_RUNTIME"
-  fi
   if grep -q '"disable": true' "$GLOBAL_RUNTIME" && grep -q '"plan"' "$GLOBAL_RUNTIME"; then
     pass "plan agent is disabled globally"
   else
     fail "plan agent should be disabled in $GLOBAL_RUNTIME"
   fi
-  # opencode debug agent plan exits 1 when plan is disabled; with pipefail that
-  # falsifies a pipeline even when grep matches "not found".
-  plan_debug="$(opencode debug agent plan 2>&1 || true)"
-  if [[ "$plan_debug" == *"not found"* ]]; then
-    pass "plan agent not loadable"
+  if grep -q '"plan_enter": "deny"' "$GLOBAL_RUNTIME" && grep -q '"plan_exit": "deny"' "$GLOBAL_RUNTIME"; then
+    pass "plan mode entry/exit denied globally"
   else
-    fail "plan agent is still enabled — prompts may hang in plan mode"
+    fail "plan_enter/plan_exit should be deny in $GLOBAL_RUNTIME"
+  fi
+  if grep -q '"default_agent": "build"' "$GLOBAL_RUNTIME"; then
+    pass "default agent is build (not plan)"
+  else
+    fail "default_agent should be build in $GLOBAL_RUNTIME"
   fi
 else
   fail "global runtime config missing ($GLOBAL_RUNTIME)"
@@ -67,6 +64,11 @@ if [ -f "$ROOT/.opencode/opencode.json" ]; then
     fail "default agent must not be a subagent — remove mode: subagent from build agent"
   else
     pass "project default agent is not a subagent"
+  fi
+  if grep -q '"disable": true' "$ROOT/.opencode/opencode.json" && grep -q '"plan_enter": "deny"' "$ROOT/.opencode/opencode.json"; then
+    pass "project config disables plan mode"
+  else
+    fail "project config should disable plan agent and deny plan_enter ($ROOT/.opencode/opencode.json)"
   fi
 else
   fail "project config missing ($ROOT/.opencode/opencode.json)"
