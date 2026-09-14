@@ -29,12 +29,13 @@ create_template() {
   local name="$1"
   local env_json="$2"
   local image="${3:-$CODING_VLLM_IMAGE}"
+  local disk_gb="${4:-50}"
   local resp
   resp=$(auth -X POST "$API/templates" -d "{
     \"name\": \"$name\",
     \"imageName\": \"$image\",
     \"isServerless\": true,
-    \"containerDiskInGb\": 50,
+    \"containerDiskInGb\": $disk_gb,
     \"env\": $env_json
   }")
   if ! echo "$resp" | jq -e '.id' >/dev/null 2>&1; then
@@ -94,7 +95,8 @@ smoke_chat() {
     ready=$(endpoint_health "$endpoint_id" | jq -r '.workers.ready // 0' 2>/dev/null || echo 0)
     echo "  smoke attempt $attempt (${elapsed}s elapsed, ready=$ready)..."
     local extra=""
-    if [ "$model" = "qwen3-8b-ha" ]; then
+    # Thinking models spend max_tokens on reasoning before "pong"; turn it off for the smoke test.
+    if [ "$model" = "qwen3-8b-ha" ] || [ "$model" = "qwen3.8-27b" ]; then
       extra=',"chat_template_kwargs":{"enable_thinking":false}'
     fi
     # Cold starts (scale-to-zero) can take several minutes — allow long per-attempt waits.
@@ -126,19 +128,30 @@ purge_queue() {
 }
 
 deploy_coding_agent() {
-  echo "=== Deploy coding-agent: qtum/Qwen3-Coder-Next-AWQ ==="
+  echo "=== Deploy coding-agent: Qwen/Qwen3.8-27B-FP8 ==="
   local env_json
-  env_json='{
-    "MODEL_NAME": "qtum/Qwen3-Coder-Next-AWQ",
-    "MAX_MODEL_LEN": "65536",
+  # Built in python so the JSON-valued args keep their quoting. VLLM_EXTRA_ARGS is
+  # shlex-split by the worker; these two flags aren't in its env-var allowlist.
+  env_json=$(python3 - <<'EOF'
+import json
+print(json.dumps({
+    "MODEL_NAME": "Qwen/Qwen3.8-27B-FP8",
+    # 131072 OOMs at startup on 48 GB (vLLM: "can serve about 128000 tokens").
+    "MAX_MODEL_LEN": "122880",
     "GPU_MEMORY_UTILIZATION": "0.9",
-    "ENFORCE_EAGER": "true",
+    "MAX_NUM_SEQS": "8",
     "ENABLE_AUTO_TOOL_CHOICE": "true",
     "TOOL_CALL_PARSER": "qwen3_coder",
-    "OPENAI_SERVED_MODEL_NAME_OVERRIDE": "qwen3-coder-next"
-  }'
+    "REASONING_PARSER": "qwen3",
+    "SPECULATIVE_CONFIG": json.dumps({"method": "mtp", "num_speculative_tokens": 3}),
+    "VLLM_EXTRA_ARGS": "--language-model-only --default-chat-template-kwargs '"
+        + json.dumps({"reasoning_effort": "low"}) + "'",
+    "OPENAI_SERVED_MODEL_NAME_OVERRIDE": "qwen3.8-27b",
+}))
+EOF
+)
   local template_id
-  template_id=$(create_template "coding-agent-vllm-$(date +%Y%m%d-%H%M%S)" "$env_json")
+  template_id=$(create_template "coding-agent-vllm-$(date +%Y%m%d-%H%M%S)" "$env_json" "$CODING_VLLM_IMAGE" 80)
   if [ -z "$template_id" ]; then
     echo "Failed to create coding-agent template" >&2
     exit 1
@@ -146,7 +159,7 @@ deploy_coding_agent() {
   echo "Created template: $template_id"
   update_endpoint "$CODING_ENDPOINT_ID" "$template_id" "$ROOT/models/coding-agent/endpoint-scaling.json"
   purge_queue "$CODING_ENDPOINT_ID" | jq -r '.removed // 0' | xargs -I{} echo "Purged {} queued jobs"
-  wait_for_worker "$CODING_ENDPOINT_ID" "qwen3-coder-next" 1200
+  wait_for_worker "$CODING_ENDPOINT_ID" "qwen3.8-27b" 1800
   echo "Coding endpoint ready. Update models/coding-agent/README.md template id to: $template_id"
 }
 
@@ -188,8 +201,7 @@ sync_scaling() {
 
 verify_only() {
   echo "=== Verify existing endpoints (no redeploy) ==="
-  smoke_chat "$CODING_ENDPOINT_ID" "qwen3-coder-next" 1200 || \
-    smoke_chat "$CODING_ENDPOINT_ID" "qwen3-coder-30b" 1200
+  smoke_chat "$CODING_ENDPOINT_ID" "qwen3.8-27b" 1800
   smoke_chat "$HA_ENDPOINT_ID" "qwen3-8b-ha"
 }
 
@@ -210,7 +222,7 @@ Usage: $(basename "$0") [command]
 
 Commands:
   all                 Deploy both endpoints + install opencode config + run tests
-  coding              Deploy Qwen3-Coder-Next-AWQ to coding-agent endpoint
+  coding              Deploy Qwen3.8-27B-FP8 to coding-agent endpoint
   home-assistant      Refresh Qwen3-8B-AWQ on home-assistant endpoint
   verify              Smoke-test existing endpoints only
   scaling             Apply endpoint-scaling.json to RunPod (no redeploy)

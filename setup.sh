@@ -38,7 +38,7 @@ if [ ! -f "$ROOT/.opencode/opencode.json" ]; then
   cat > "$ROOT/.opencode/opencode.json" <<'EOF'
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "runpod/qwen3-coder-next",
+  "model": "runpod/qwen3.8-27b",
   "default_agent": "build",
   "instructions": [".opencode/instructions.md"],
   "agent": {

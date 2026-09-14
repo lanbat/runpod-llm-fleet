@@ -5,10 +5,10 @@ Feature: opencode <-> RunPod provider integration
 
   Scenario: opencode recognizes the RunPod provider and model
     When I run `opencode models runpod`
-    Then the output includes "runpod/qwen3-coder-next"
+    Then the output includes "runpod/qwen3.8-27b"
 
   Scenario: opencode completes a simple one-shot prompt
-    When I run `opencode run --model runpod/qwen3-coder-next "Write a one-line python function that adds two numbers. Just the code, no explanation."`
+    When I run `opencode run --model runpod/qwen3.8-27b "Write a one-line python function that adds two numbers. Just the code, no explanation."`
     Then the process exits with code 0
     And the output contains a python lambda or def for addition
 

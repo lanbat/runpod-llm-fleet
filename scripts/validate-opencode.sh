@@ -99,10 +99,10 @@ if [ -f "$KEY_FILE" ]; then
 fi
 
 if command -v opencode >/dev/null 2>&1; then
-  if opencode models runpod 2>&1 | grep -q 'runpod/qwen3-coder-next'; then
-    pass "opencode lists runpod/qwen3-coder-next"
+  if opencode models runpod 2>&1 | grep -q 'runpod/qwen3.8-27b'; then
+    pass "opencode lists runpod/qwen3.8-27b"
   else
-    fail "opencode does not list runpod/qwen3-coder-next"
+    fail "opencode does not list runpod/qwen3.8-27b"
   fi
 fi
 

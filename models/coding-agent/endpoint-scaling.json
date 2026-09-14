@@ -3,5 +3,7 @@
   "workersMax": 1,
   "idleTimeout": 600,
   "scalerType": "QUEUE_DELAY",
-  "scalerValue": 4
+  "scalerValue": 4,
+  "flashboot": true,
+  "executionTimeoutMs": 1800000
 }

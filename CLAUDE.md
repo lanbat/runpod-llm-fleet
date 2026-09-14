@@ -63,6 +63,15 @@ home-assistant) — check a candidate model's `config.json` `architectures` fiel
 committing to a deploy; a `*ForConditionalGeneration` value is a real risk signal even
 if the model is text-only.
 
+**Newer image changes this (Sep 2026):** `coding-agent` now runs `Qwen/Qwen3.8-27B-FP8`
+(`Qwen3_5ForConditionalGeneration`, the same wrapper class as the failed Qwen3.5-9B) on
+`runpod/worker-v1-vllm:v2.27.0` (vLLM 0.29.0) with `--language-model-only`, and it loads
+and serves fine. The architecture field is still worth checking, but on a current image
+the real blocker was plain memory — see "`MAX_MODEL_LEN` is 122880" in
+`models/coding-agent/README.md`. When a worker crash-loops, submit an async `/run` job and
+poll `/status/<id>`: the worker's `startup_error` text lands in the job's `error` field,
+while the sync OpenAI route only hangs or fails fast.
+
 **Cheap way to de-risk this going forward**: smoke-test any very-recently-released model
 on a scale-to-zero endpoint first, even if the final deployment will be always-on
 (`workersMin=1`) — `home-assistant`'s Qwen3.5 attempt burned real always-on GPU time

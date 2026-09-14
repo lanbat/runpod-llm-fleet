@@ -1,7 +1,7 @@
 # OpenCode + RunPod setup
 
 This guide covers installing and using [OpenCode](https://opencode.ai) with the
-`coding-agent` RunPod endpoint (`qwen3-coder-next` on endpoint `h8ins1a7nls350`).
+`coding-agent` RunPod endpoint (`qwen3.8-27b` on endpoint `h8ins1a7nls350`).
 
 ## Recommended setup (Cursor-like UX, RunPod Qwen model)
 
@@ -11,8 +11,8 @@ Global defaults live in `~/.config/opencode/opencode.json`:
 |---------|-------|-----|
 | `default_agent` | `build` | Direct implementation (not `plan`, which loops on large tasks) |
 | `agent.plan.disable` | `true` | Plan mode disabled — it hangs/loops with RunPod Qwen |
-| `model` | `runpod/qwen3-coder-next` | Self-hosted Qwen3 Coder Next on RunPod |
-| `small_model` | `runpod/qwen3-coder-next` | Same endpoint for titles/summaries |
+| `model` | `runpod/qwen3.8-27b` | Self-hosted Qwen3.8-27B (FP8) on RunPod |
+| `small_model` | `runpod/qwen3.8-27b` | Same endpoint for titles/summaries |
 | `compaction.prune` | `true` | Drops old tool output to avoid 100k+ token blowups |
 | `permission.external_directory` | `/home/traph/projects/**` allow | No prompts when reading across the monorepo |
 | `watcher.ignore` | `node_modules`, `.git`, etc. | Faster indexing in large repos |
@@ -37,8 +37,8 @@ cd runpod-llm-fleet
 
 # 4. Use (first request after idle cold-starts the GPU — 1–5+ min wait)
 cd runpod-llm-fleet
-opencode                          # TUI — select runpod / qwen3-coder-next
-opencode run --model runpod/qwen3-coder-next "explain this repo"
+opencode                          # TUI — select runpod / qwen3.8-27b
+opencode run --model runpod/qwen3.8-27b "explain this repo"
 ```
 
 ## Architecture
@@ -57,7 +57,7 @@ The RunPod provider is a **custom** OpenAI-compatible provider. It is **not** st
 ```
 ┌─────────────┐     Bearer token      ┌──────────────────────────────────────┐
 │  OpenCode   │ ────────────────────► │ RunPod serverless (h8ins1a7nls350)   │
-│  TUI / CLI  │  /openai/v1/chat/...  │ vLLM + Qwen3-Coder-Next-AWQ         │
+│  TUI / CLI  │  /openai/v1/chat/...  │ vLLM + Qwen3.8-27B-FP8              │
 └─────────────┘                       └──────────────────────────────────────┘
        │
        │ reads
@@ -141,10 +141,33 @@ and configures compaction, permissions, and watcher ignores.
 | `apiKey` | `{file:~/.config/envman/RUNPOD.key}` | See above |
 | `timeout` | `600000` (10 min) | Tolerates cold starts |
 | `chunkTimeout` | `180000` (3 min) | Per-chunk streaming timeout |
-| `limit.context` | `65536` | Must match endpoint `MAX_MODEL_LEN` |
+| `limit.context` | `106496` | Endpoint `MAX_MODEL_LEN` (122880) − 16384 — see "Context budget" |
 | `limit.output` | `32768` | Large enough for multi-KB `write` tool calls |
+| `options.reasoningEffort` | `low` | Sent as `reasoning_effort`; variants `low` / `medium` / `high` (→ `xhigh`) |
+| `interleaved.field` | `reasoning_content` | Sends earlier reasoning back (Qwen's `preserve_thinking`) |
 
-Model id in OpenCode: `runpod/qwen3-coder-next` (`provider/model` slash syntax).
+Model id in OpenCode: `runpod/qwen3.8-27b` (`provider/model` slash syntax).
+
+### Context budget: `limit.context` must stay below `MAX_MODEL_LEN`
+
+opencode sends `max_tokens = min(limit.output, 32000)` with every request, and only compacts
+*after* a step has pushed the prompt past `limit.context − max_tokens`. The request that crosses
+that line can overshoot by one step's tool output (`tool_output.max_bytes` 32768 ≈ 10K tokens).
+If `prompt + max_tokens` then exceeds the endpoint's `MAX_MODEL_LEN`, the request fails — on RunPod
+it surfaced as empty responses that opencode retried until `SSE read timed out`. That is what broke
+long sessions on the old Qwen3-Coder-Next config (`limit.context` = `MAX_MODEL_LEN` = 65536, which
+failed at ~33.5K prompt tokens).
+
+Rule: `limit.context ≤ MAX_MODEL_LEN − 16384` (currently 122880 − 16384 = 106496).
+`models/coding-agent/run_tests.sh` (`feature_context_budget`) sends that worst-case request.
+
+### Reasoning effort
+
+Qwen3.8-27B thinks before answering. The endpoint defaults `reasoning_effort` to `low`
+(`--default-chat-template-kwargs`) and the provider config sends `low` as well. For harder tasks,
+switch the model variant in the TUI to `medium` or `high` (mapped to Qwen's `xhigh`). Don't add a
+variant that sends `"high"`: Qwen's chat template only accepts `low` / `medium` / `xhigh` and
+rejects anything else with a 400.
 
 ### Project defaults (`.opencode/opencode.json`)
 
@@ -152,7 +175,7 @@ Checked into this repo. Applied when you run OpenCode inside `runpod-llm-fleet/`
 
 | Setting | Value | Purpose |
 |---------|-------|---------|
-| `model` | `runpod/qwen3-coder-next` | Default model |
+| `model` | `runpod/qwen3.8-27b` | Default model |
 | `default_agent` | `build` | Primary coding agent (must **not** be a subagent) |
 | `enabled_providers` | `runpod`, `anthropic` | Limit provider picker |
 | `plugin` | `opencode-claude-auth@latest` | Anthropic OAuth when needed |
@@ -171,20 +194,20 @@ cd runpod-llm-fleet
 opencode
 ```
 
-Select model **runpod / Qwen3 Coder Next** (or it will default from project config).
+Select model **runpod / Qwen3.8 27B FP8 (RunPod)** (or it will default from project config).
 Type prompts at the bottom; the agent can edit files and run bash per permissions.
 
 ### One-shot CLI
 
 ```bash
-opencode run --model runpod/qwen3-coder-next "Write a one-line Python add function"
+opencode run --model runpod/qwen3.8-27b "Write a one-line Python add function"
 ```
 
 ### List models
 
 ```bash
 opencode models runpod
-# runpod/qwen3-coder-next
+# runpod/qwen3.8-27b
 ```
 
 ### Auth for built-in providers
@@ -226,10 +249,10 @@ curl -s "https://api.runpod.ai/v2/h8ins1a7nls350/health" \
   -H "Authorization: Bearer $(cat ~/.config/envman/RUNPOD.key)"
 ```
 
-### `Model not found: runpod:qwen3-coder-next/.`
+### `Model not found: runpod:qwen3.8-27b/.`
 
-OpenCode expects slash-separated model ids (`runpod/qwen3-coder-next`), not colon
-(`runpod:qwen3-coder-next`). Update `.opencode/opencode.json` if you see this error.
+OpenCode expects slash-separated model ids (`runpod/qwen3.8-27b`), not colon
+(`runpod:qwen3.8-27b`). Update `.opencode/opencode.json` if you see this error.
 
 ### Prompt hangs / spinner never stops
 
@@ -272,6 +295,12 @@ Pull latest `.opencode/opencode.json` or remove `"mode": "subagent"` yourself.
 Scale-to-zero endpoints wake on first request (can take 1–5+ minutes). `timeout` and
 `chunkTimeout` in the provider config are set high for this. Retry once if the first
 request hangs right after a worker reports ready (known RunPod/vLLM quirk).
+
+### Session stops with `SSE read timed out` after many empty steps
+
+The prompt plus `max_tokens` outgrew the endpoint's `MAX_MODEL_LEN`. Check
+`limit.context ≤ MAX_MODEL_LEN − 16384` (see "Context budget"), reinstall with
+`./scripts/setup-opencode.sh`, and start a fresh session (`/new`).
 
 ### `JSON parsing failed` on large file writes
 
