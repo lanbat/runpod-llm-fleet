@@ -4,7 +4,7 @@
 set -euo pipefail
 
 ENDPOINT_ID="h8ins1a7nls350"
-MODEL="qwen3-coder-next"
+MODEL="qwen3.8-27b"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 require_key() {
@@ -60,7 +60,7 @@ warmup_sync() {
     resp=$(curl -sS --max-time 90 "$base" \
       -H "Authorization: Bearer $RUNPOD_API_KEY" \
       -H "Content-Type: application/json" \
-      -d "{\"model\":\"$MODEL\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly: pong\"}],\"max_tokens\":10}" 2>&1) || true
+      -d "{\"model\":\"$MODEL\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly: pong\"}],\"max_tokens\":10,\"chat_template_kwargs\":{\"enable_thinking\":false}}" 2>&1) || true
     content=$(echo "$resp" | jq -r '.choices[0].message.content // empty' 2>/dev/null || true)
     if [ "$content" = "pong" ]; then
       echo "  warmup OK"

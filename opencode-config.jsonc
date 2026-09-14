@@ -3,7 +3,7 @@
   "provider": {
     "runpod": {
       "npm": "@ai-sdk/openai-compatible",
-      "name": "RunPod (Qwen3-Coder-Next)",
+      "name": "RunPod (Qwen3.8-27B)",
       "options": {
         "baseURL": "https://api.runpod.ai/v2/h8ins1a7nls350/openai/v1",
         "apiKey": "{file:~/.config/envman/RUNPOD.key}",
@@ -11,11 +11,26 @@
         "chunkTimeout": 180000
       },
       "models": {
-        "qwen3-coder-next": {
-          "name": "Qwen3 Coder Next AWQ (RunPod)",
+        "qwen3.8-27b": {
+          "name": "Qwen3.8 27B FP8 (RunPod)",
+          "reasoning": true,
+          "tool_call": true,
+          "interleaved": { "field": "reasoning_content" },
           "limit": {
-            "context": 65536,
+            // Endpoint MAX_MODEL_LEN is 122880. opencode compacts only after a step pushes the
+            // prompt past context - 32000, so the next request can overshoot by one step's tool
+            // output; keep 16K below MAX_MODEL_LEN for it (see features/context_budget.feature).
+            "context": 106496,
             "output": 32768
+          },
+          "options": {
+            "reasoningEffort": "low"
+          },
+          // Qwen3.8's chat template only accepts low / medium / xhigh ("high" is a 400).
+          "variants": {
+            "low": { "reasoningEffort": "low" },
+            "medium": { "reasoningEffort": "medium" },
+            "high": { "reasoningEffort": "xhigh" }
           }
         }
       }

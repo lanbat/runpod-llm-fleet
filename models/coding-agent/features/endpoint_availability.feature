@@ -1,5 +1,5 @@
 Feature: RunPod serverless endpoint availability
-  The Qwen3-32B endpoint should scale down when idle to save cost, scale up
+  The coding-agent endpoint should scale down when idle to save cost, scale up
   on demand, and stay warm during an active session.
 
   Scenario: Endpoint responds when a worker is already warm

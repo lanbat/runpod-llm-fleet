@@ -34,7 +34,7 @@ Replace `/path/to/your/projects` with your actual workspace roots.
   "provider": {
     "runpod": {
       "npm": "@ai-sdk/openai-compatible",
-      "name": "RunPod (Qwen3-Coder-Next)",
+      "name": "RunPod (Qwen3.8-27B)",
       "options": {
         "baseURL": "https://api.runpod.ai/v2/h8ins1a7nls350/openai/v1",
         "apiKey": "{file:~/.config/envman/RUNPOD.key}",
@@ -42,9 +42,18 @@ Replace `/path/to/your/projects` with your actual workspace roots.
         "chunkTimeout": 180000
       },
       "models": {
-        "qwen3-coder-next": {
-          "name": "Qwen3 Coder Next AWQ (RunPod)",
-          "limit": { "context": 65536, "output": 32768 }
+        "qwen3.8-27b": {
+          "name": "Qwen3.8 27B FP8 (RunPod)",
+          "reasoning": true,
+          "tool_call": true,
+          "interleaved": { "field": "reasoning_content" },
+          "limit": { "context": 106496, "output": 32768 },
+          "options": { "reasoningEffort": "low" },
+          "variants": {
+            "low": { "reasoningEffort": "low" },
+            "medium": { "reasoningEffort": "medium" },
+            "high": { "reasoningEffort": "xhigh" }
+          }
         }
       }
     }

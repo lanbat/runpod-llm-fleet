@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install global + project opencode config for the RunPod Qwen3-Coder-Next fleet.
+# Install global + project opencode config for the RunPod Qwen3.8-27B fleet.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -46,6 +46,6 @@ echo "  Project defaults:       $ROOT/.opencode/opencode.json"
 echo ""
 echo "Usage (scale-to-zero — first request after idle cold-starts the GPU, 1–5+ min):"
 echo "  cd $ROOT && opencode           # TUI with project defaults"
-echo "  opencode run --model runpod/qwen3-coder-next \"your prompt\""
+echo "  opencode run --model runpod/qwen3.8-27b \"your prompt\""
 echo ""
 echo "See docs/opencode-setup.md for full documentation."
