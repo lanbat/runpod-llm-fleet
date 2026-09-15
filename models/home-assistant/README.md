@@ -69,11 +69,11 @@ tokens (no thinking overhead).
 ## Live RunPod resources
 
 - Endpoint id: `0y3ptl2r9oachs`
-- Template id: `9meabjszeo`
+- Template id: `uy9fw283mc` (vLLM worker `runpod/worker-v1-vllm:v2.27.0`)
 - `workersMin=0`, `workersMax=1`, `idleTimeout=300` — scale-to-zero (see "Scaling"
   above for why this isn't always-on despite the original plan). gpuTypeIds includes
   RTX 4090/L40/L40S/RTX A6000 as fallbacks for availability.
-- `MAX_MODEL_LEN=32768` — far more than HA needs (short turns + tool defs), but small
+- `executionTimeoutMs=600000` (10 min) — cold starts can take ~100s; the old 120s default caused sync timeouts
   enough that cold starts should stay reasonably fast for this model's size (confirm
   actual cold-start time — not yet measured post-revert).
 - `TOOL_CALL_PARSER=hermes` (plain JSON tool calls — this model's native format, unlike
