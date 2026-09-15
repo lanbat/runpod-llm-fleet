@@ -10,7 +10,7 @@ CODING_ENDPOINT_ID="h8ins1a7nls350"
 HA_ENDPOINT_ID="0y3ptl2r9oachs"
 
 CODING_VLLM_IMAGE="runpod/worker-v1-vllm:v2.27.0"
-HA_VLLM_IMAGE="runpod/worker-v1-vllm:v2.25.1"
+HA_VLLM_IMAGE="runpod/worker-v1-vllm:v2.27.0"
 GPU_TYPES='["NVIDIA L40", "NVIDIA L40S", "NVIDIA RTX A6000"]'
 
 require_key() {
@@ -172,7 +172,7 @@ template = pathlib.Path('$ROOT/models/home-assistant/qwen3_nonthinking.jinja').r
 print(json.dumps({
     'MODEL_NAME': 'Qwen/Qwen3-8B-AWQ',
     'QUANTIZATION': 'awq',
-    'MAX_MODEL_LEN': '32768',
+    'MAX_MODEL_LEN': '8192',
     'GPU_MEMORY_UTILIZATION': '0.9',
     'ENFORCE_EAGER': 'true',
     'ENABLE_AUTO_TOOL_CHOICE': 'true',
