@@ -1,5 +1,8 @@
 # runpod-llm-fleet
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![IRC: #lanbat on Libera.Chat](https://img.shields.io/badge/IRC-%23lanbat%20on%20Libera.Chat-2f4bff.svg)](https://web.libera.chat/#lanbat)
+
 **Run your own open-weight LLMs on serverless GPUs, one endpoint per job, and pay only while they answer.**
 
 This repository holds a small fleet of language models on [RunPod](https://www.runpod.io/) serverless
