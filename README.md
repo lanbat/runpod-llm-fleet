@@ -1,48 +1,67 @@
 # runpod-llm-fleet
 
+[![check](https://github.com/lanbat/runpod-llm-fleet/actions/workflows/check.yml/badge.svg)](https://github.com/lanbat/runpod-llm-fleet/actions/workflows/check.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![IRC: #lanbat on Libera.Chat](https://img.shields.io/badge/IRC-%23lanbat%20on%20Libera.Chat-2f4bff.svg)](https://web.libera.chat/#lanbat)
 
-Part of [LAN BAT](https://lanbat.github.io/), open home infrastructure you can read, fork and borrow from.
+**Run your own open-weight LLMs on serverless GPUs, one endpoint per job, and pay only while they answer.**
 
-This repository contains configuration and test suites for LLMs hosted on RunPod serverless endpoints, organized by purpose.
+This repository holds a small fleet of language models on [RunPod](https://www.runpod.io/) serverless
+endpoints (the vLLM worker, behind an OpenAI-compatible API). Each purpose gets a model sized
+for its task, its own scaling policy and a behaviour test suite, so you can swap models with evidence
+instead of vibes.
 
-## Architecture
+Part of [LAN BAT](https://lanbat.github.io/), open home infrastructure. The Home Assistant
+endpoint is the voice and conversation agent for [lanbat/nixconf](https://github.com/lanbat/nixconf).
 
-Each LLM purpose has its own directory under `models/`:
-- `models/coding-agent` - Qwen3.8-27B (official FP8)
-- `models/home-assistant` - Qwen3-8B (AWQ)
+## The fleet
 
-## Installation Instructions
+| Purpose | Directory | Model | Consumer | Scaling |
+|---------|-----------|-------|----------|---------|
+| Coding assistant backend | [`models/coding-agent`](models/coding-agent/README.md) | Qwen3.8-27B (FP8) | [opencode](https://opencode.ai/) | Scale-to-zero |
+| Home Assistant conversation agent | [`models/home-assistant`](models/home-assistant/README.md) | Qwen3-8B (AWQ) | Home Assistant | Scale-to-zero |
 
-### Prerequisites
+## Why this setup
 
-1. **Required Tools**
-   - `curl`
-   - `python3` 
-   - `sqlite3`
-   - `npm` (for opencode)
+- **Your model, your endpoint.** Code and home-automation requests go to an open-weight model you chose
+  and deployed, not a closed chat API that can change under you.
+- **Scale-to-zero.** Workers stop after a few idle minutes. Each model README shows the real
+  numbers: always-on for the Home Assistant model would have cost about $790 a month.
+- **Tested like software.** Every model has `.feature` specs and a `run_tests.sh` that runs against the
+  live endpoint: the OpenAI API contract and availability for both, tool calling for Home Assistant,
+  and context budget and agent stability for the coding model.
+- **Decisions written down.** The model READMEs explain why the Home Assistant agent stays on Qwen3-8B
+  rather than Qwen3.5, and how context length trades against cold-start time.
+- **One command to rebuild.** `deploy-fleet.sh` deploys or refreshes the endpoints, installs the
+  opencode config and smoke-tests the result.
 
-2. **RunPod API key** — stored in `~/.config/envman/` (see
-   [`docs/opencode-setup.md`](docs/opencode-setup.md))
+## Quick start
 
-### Setup Steps
+You need `curl`, `python3`, `sqlite3`, `npm` and a RunPod API key.
 
-1. **Clone Repository**
-   ```bash
-   git clone <repository-url>
-   cd runpod-llm-fleet
-   ```
+```bash
+git clone https://github.com/lanbat/runpod-llm-fleet
+cd runpod-llm-fleet
 
-2. **Install OpenCode + fleet config**
-   ```bash
-   npm install -g @opencode/cli
-   echo 'export RUNPOD_API_KEY="rpa_..."' > ~/.config/envman/RUNPOD.env
-   ./scripts/setup-opencode.sh
-   ./scripts/validate-opencode.sh
-   ```
+# API key for the scripts (opencode reads it from a file, see docs/opencode-setup.md)
+mkdir -p ~/.config/envman
+echo 'export RUNPOD_API_KEY="rpa_..."' > ~/.config/envman/RUNPOD.env
 
-   Full documentation: [`docs/opencode-setup.md`](docs/opencode-setup.md)
+# Deploy or refresh the endpoints, install the opencode config, run the smoke tests
+./scripts/deploy-fleet.sh all      # both endpoints
+./scripts/deploy-fleet.sh coding   # coding endpoint only
+./scripts/deploy-fleet.sh verify   # smoke-test without redeploying
+```
+
+To use the coding endpoint from opencode:
+
+```bash
+npm install -g @opencode/cli
+./scripts/setup-opencode.sh
+./scripts/validate-opencode.sh
+```
+
+Full guide: [`docs/opencode-setup.md`](docs/opencode-setup.md).
 
 ## Configuring a new RunPod endpoint
 
@@ -57,22 +76,6 @@ Navigate to a specific model directory and run the test suite:
 ```bash
 cd models/coding-agent
 ./run_tests.sh
-```
-
-## Fleet Overview
-
-| Purpose | Directory | Current Model | Consumer | Scaling |
-|---------|-----------|---------------|----------|---------|
-| Coding assistant backend | `models/coding-agent` | Qwen3.8-27B (FP8) | opencode | Scale-to-zero |
-| Home Assistant conversation agent | `models/home-assistant` | Qwen3-8B (AWQ) | Home Assistant | Scale-to-zero |
-
-### Deploy / refresh endpoints
-
-```bash
-export RUNPOD_API_KEY=<key>
-./scripts/deploy-fleet.sh all      # deploy both + install opencode config + test
-./scripts/deploy-fleet.sh coding   # coding endpoint only
-./scripts/deploy-fleet.sh verify   # smoke-test without redeploying
 ```
 
 ## Important Notes
