@@ -1,4 +1,9 @@
-# RunPod LLM Fleet Setup
+# runpod-llm-fleet
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![IRC: #lanbat on Libera.Chat](https://img.shields.io/badge/IRC-%23lanbat%20on%20Libera.Chat-2f4bff.svg)](https://web.libera.chat/#lanbat)
+
+Part of [LAN BAT](https://lanbat.github.io/), open home infrastructure you can read, fork and borrow from.
 
 This repository contains configuration and test suites for LLMs hosted on RunPod serverless endpoints, organized by purpose.
 
