@@ -37,7 +37,7 @@ Previous models: `qtum/Qwen3-Coder-Next-AWQ` (to Sep 14 2026), before that
   | Field | Value | Effect |
   |-------|-------|--------|
   | `workersMin` | `0` | Scale-to-zero — no GPU cost while idle |
-  | `workersMax` | `0` | **Endpoint disabled** (no workers can start). Set to `1` and run `./scripts/deploy-fleet.sh scaling` to use it |
+  | `workersMax` | `1` | At most one worker (set to `0` to disable the endpoint and stop all GPU spend) |
   | `idleTimeout` | `1800` | Worker shuts down 30 min after last request |
   | `scalerType` | `QUEUE_DELAY` | Scale up when queue delay exceeds threshold |
   | `scalerValue` | `4` | Queue-delay threshold (seconds) |
