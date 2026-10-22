@@ -9,8 +9,8 @@ Global defaults live in `~/.config/opencode/opencode.json`:
 
 | Setting | Value | Why |
 |---------|-------|-----|
-| `default_agent` | `build` | Direct implementation (not `plan`, which loops on large tasks) |
-| `agent.plan.disable` | `true` | Plan mode disabled — it hangs/loops with RunPod Qwen |
+| `default_agent` | `build` | Direct implementation by default |
+| `agent.plan` | enabled, guarded | Plan mode re-enabled with loop guards — see "Plan mode" below |
 | `model` | `runpod/qwen3.8-27b` | Self-hosted Qwen3.8-27B (FP8) on RunPod |
 | `small_model` | `runpod/qwen3.8-27b` | Same endpoint for titles/summaries |
 | `compaction.prune` | `true` | Drops old tool output to avoid 100k+ token blowups |
@@ -114,8 +114,8 @@ source ~/.config/envman/RUNPOD.env
 | Setting | Value | Effect |
 |---------|-------|--------|
 | `workersMin` | `0` | Scale-to-zero — no GPU cost while idle |
-| `workersMax` | `1` | At most one worker |
-| `idleTimeout` | `600` | Worker shuts down 10 min after last request |
+| `workersMax` | `1` | At most one worker (set to `0` to disable the endpoint and stop all GPU spend) |
+| `idleTimeout` | `1800` | Worker shuts down 30 min after last request |
 | `scalerType` | `QUEUE_DELAY` | Scale up when queue delay exceeds threshold |
 | `scalerValue` | `4` | Queue-delay threshold (seconds) |
 
@@ -132,19 +132,43 @@ Installed to `~/.config/opencode/opencode.jsonc` by `setup-opencode.sh` or
 ### Global runtime (`opencode-runtime.json`)
 
 Installed to `~/.config/opencode/opencode.json` by `setup-opencode.sh`. Sets
-`default_agent: build`, disables the `plan` agent (`agent.plan.disable: true`),
+`default_agent: build`, enables the `plan` agent with loop guards (see "Plan mode"),
 and configures compaction, permissions, and watcher ignores.
 
 | Option | Value | Notes |
 |--------|-------|-------|
 | `baseURL` | `https://api.runpod.ai/v2/h8ins1a7nls350/openai/v1` | Coding-agent endpoint |
 | `apiKey` | `{file:~/.config/envman/RUNPOD.key}` | See above |
-| `timeout` | `600000` (10 min) | Tolerates cold starts |
-| `chunkTimeout` | `180000` (3 min) | Per-chunk streaming timeout |
+| `timeout` | `1800000` (30 min) | Whole-request budget; matches the endpoint's `executionTimeoutMs` |
+| `chunkTimeout` | `420000` (7 min) | Per-chunk streaming timeout — must outlast a cold start, see below |
 | `limit.context` | `106496` | Endpoint `MAX_MODEL_LEN` (122880) − 16384 — see "Context budget" |
 | `limit.output` | `32768` | Large enough for multi-KB `write` tool calls |
 | `options.reasoningEffort` | `low` | Sent as `reasoning_effort`; variants `low` / `medium` / `high` (→ `xhigh`) |
 | `interleaved.field` | `reasoning_content` | Sends earlier reasoning back (Qwen's `preserve_thinking`) |
+
+### Plan mode (re-enabled with loop guards, Oct 2026)
+
+Plan mode was originally disabled (`agent.plan.disable: true`) because it
+hangs/loops on the RunPod Qwen model: plan mode is long multi-step exploration,
+and at `low` reasoning effort the model repeats tool calls; the old config also
+denied `plan_exit`, so the built-in "call plan_exit when done" flow could never
+complete. It is now enabled in **all three config layers** (global
+`~/.config/opencode/opencode.json`, `~/.projects/lanbat/.opencode/opencode.json`,
+and the project `.opencode/opencode.json`) with guards:
+
+| Setting | Value | Purpose |
+|---------|-------|---------|
+| `agent.plan.steps` | `30` | Hard cap on agentic iterations — forces a text-only summary instead of looping forever |
+| `agent.plan.variant` | `medium` | More reasoning than build's `low`; helps the model course-correct |
+| `agent.plan.temperature` | `0.1` | Deterministic exploration |
+| `agent.plan.permission.doom_loop` | `deny` | Auto-stop when the model repeats the same tool call |
+| `permission.plan_enter` | `ask` | Prompt before entering plan mode |
+| `permission.plan_exit` | `allow` | Lets the model finish planning cleanly |
+
+`build`'s own `plan_enter`/`plan_exit: deny` are unchanged, so the build agent
+still cannot switch modes. To roll back, restore the timestamped backups
+(`opencode.json.bak.20261022140719` next to each config) or set
+`agent.plan.disable: true` again.
 
 Model id in OpenCode: `runpod/qwen3.8-27b` (`provider/model` slash syntax).
 
@@ -281,8 +305,9 @@ truth: `models/coding-agent/endpoint-scaling.json`, applied via
 cold start automatically — expect 1–5+ minutes before the first token. No local wake
 scripts are needed.
 
-**Timeouts:** `chunkTimeout=180000` (3 min) tolerates cold starts; don't lower it
-without accounting for cold-start latency.
+**Timeouts:** `chunkTimeout=420000` (7 min) is the 5-minute cold-start ceiling plus a
+2-minute full-context prefill margin. Don't lower it below the cold start — 3 min was too
+short and every first request after idle died with `SSE read timed out` (see below).
 
 ### `default agent "build" is a subagent`
 
@@ -295,6 +320,32 @@ Pull latest `.opencode/opencode.json` or remove `"mode": "subagent"` yourself.
 Scale-to-zero endpoints wake on first request (can take 1–5+ minutes). `timeout` and
 `chunkTimeout` in the provider config are set high for this. Retry once if the first
 request hangs right after a worker reports ready (known RunPod/vLLM quirk).
+
+### Every request fails with `SSE read timed out` right after idle
+
+RunPod's sync OpenAI route sends **no SSE bytes at all** while a worker cold-starts, so the
+entire cold start is charged to opencode's `chunkTimeout` — the per-chunk timer starts before
+the first byte, it is not just a mid-stream stall detector. With `chunkTimeout=180000` (3 min)
+against a ~4.5-minute cold start, the first request after `idleTimeout` aborted every time.
+
+It then compounds: aborting the HTTP request does **not** cancel the RunPod job, which keeps
+running against `executionTimeoutMs` (30 min) and occupies the one allowed worker
+(`workersMax=1`). opencode retries, the retry queues behind the orphaned job, and the
+endpoint sits at `running:1 ready:0` — so the failure looks constant rather than
+once-per-cold-start.
+
+Fixed by raising `chunkTimeout` to `420000` (7 min). To confirm which side is at fault:
+
+```bash
+# Warm worker: first chunk should arrive in well under a second.
+curl -N -H "Authorization: Bearer $RUNPOD_API_KEY" -H 'Content-Type: application/json' \
+  https://api.runpod.ai/v2/h8ins1a7nls350/openai/v1/chat/completions \
+  -d '{"model":"qwen3.8-27b","messages":[{"role":"user","content":"hi"}],"max_tokens":8,"stream":true}'
+```
+
+If that streams instantly but opencode still times out, the config didn't reload — restart
+opencode. If it hangs, the worker is cold or wedged: `./scripts/runpod-recover.sh`.
+Guarded by `feature_cold_start_timeout` in `models/coding-agent/run_tests.sh`.
 
 ### Session stops with `SSE read timed out` after many empty steps
 

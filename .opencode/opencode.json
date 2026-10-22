@@ -16,7 +16,13 @@
   "references": {},
   "agent": {
     "plan": {
-      "disable": true
+      "disable": false,
+      "steps": 30,
+      "variant": "medium",
+      "temperature": 0.1,
+      "permission": {
+        "doom_loop": "deny"
+      }
     },
     "build": {
       "model": "runpod/qwen3.8-27b",
@@ -35,8 +41,8 @@
   "permission": {
     "edit": "allow",
     "bash": "allow",
-    "plan_enter": "deny",
-    "plan_exit": "deny",
+    "plan_enter": "ask",
+    "plan_exit": "allow",
     "doom_loop": "ask",
     "external_directory": {
       "/tmp/*": "allow",

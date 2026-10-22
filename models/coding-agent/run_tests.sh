@@ -191,6 +191,67 @@ print(json.dumps({
   fi
 }
 
+# ---------- Feature: cold_start_timeout ----------
+# RunPod's sync route streams nothing while a scale-to-zero worker boots, so the whole
+# cold start is charged to opencode's per-chunk timeout. Ceiling is the documented
+# cold-start upper bound; the margin covers prefill of a full-context prompt.
+COLD_START_CEILING_MS=300000
+PREFILL_MARGIN_MS=120000
+
+feature_cold_start_timeout() {
+  echo "Feature: cold start timeout"
+
+  timeouts=$(python3 -c '
+import json, re, sys
+cfg = json.loads(re.sub(r"^\s*//.*$", "", open(sys.argv[1]).read(), flags=re.M))
+opts = cfg["provider"]["runpod"]["options"]
+print(opts["timeout"], opts["chunkTimeout"])' "$ROOT/opencode-config.jsonc" 2>/dev/null)
+  read -r req_timeout chunk_timeout <<<"$timeouts"
+  if [ -z "${chunk_timeout:-}" ]; then
+    fail "Scenario: read timeout/chunkTimeout from opencode-config.jsonc"
+    return
+  fi
+
+  required=$(( COLD_START_CEILING_MS + PREFILL_MARGIN_MS ))
+  if [ "$chunk_timeout" -ge "$required" ]; then
+    pass "Scenario: chunkTimeout ${chunk_timeout}ms covers cold start + prefill (needs >= ${required}ms)"
+  else
+    fail "Scenario: chunkTimeout ${chunk_timeout}ms is below the ${required}ms cold-start budget — first request after idle aborts with 'SSE read timed out'"
+  fi
+
+  if [ "$req_timeout" -gt "$chunk_timeout" ]; then
+    pass "Scenario: timeout ${req_timeout}ms exceeds chunkTimeout ${chunk_timeout}ms"
+  else
+    fail "Scenario: timeout ${req_timeout}ms must exceed chunkTimeout ${chunk_timeout}ms"
+  fi
+
+  # A warm worker must answer far inside chunkTimeout; this is what the aborts were masking.
+  ttfb=$(python3 -c '
+import json, os, sys, time, urllib.request
+key = os.environ["RUNPOD_API_KEY"]
+body = json.dumps({"model": sys.argv[2], "max_tokens": 10, "stream": True,
+                   "chat_template_kwargs": {"enable_thinking": False},
+                   "messages": [{"role": "user", "content": "Reply with exactly: pong"}]}).encode()
+req = urllib.request.Request(sys.argv[1] + "/openai/v1/chat/completions", data=body,
+                             headers={"Authorization": "Bearer " + key,
+                                      "Content-Type": "application/json"})
+t0 = time.time()
+try:
+    r = urllib.request.urlopen(req, timeout=int(sys.argv[3]) / 1000)
+    for line in r:
+        if line.strip():
+            print(int((time.time() - t0) * 1000))
+            break
+except Exception:
+    print(-1)' "$BASE" "$MODEL" "$chunk_timeout" 2>/dev/null)
+
+  if [ "${ttfb:--1}" -gt 0 ] && [ "$ttfb" -lt "$chunk_timeout" ]; then
+    pass "Scenario: warm endpoint streams first chunk in ${ttfb}ms (< ${chunk_timeout}ms)"
+  else
+    fail "Scenario: warm endpoint did not stream a first chunk within ${chunk_timeout}ms (got: ${ttfb}ms)"
+  fi
+}
+
 # ---------- Feature: opencode_integration ----------
 feature_opencode_integration() {
   echo "Feature: opencode integration"
@@ -299,6 +360,7 @@ echo
 feature_endpoint_availability; echo
 feature_openai_api_contract; echo
 feature_context_budget; echo
+feature_cold_start_timeout; echo
 feature_opencode_integration; echo
 feature_repo_awareness; echo
 feature_agentic_stability; echo

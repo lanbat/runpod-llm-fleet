@@ -37,8 +37,8 @@ Previous models: `qtum/Qwen3-Coder-Next-AWQ` (to Sep 14 2026), before that
   | Field | Value | Effect |
   |-------|-------|--------|
   | `workersMin` | `0` | Scale-to-zero — no GPU cost while idle |
-  | `workersMax` | `1` | At most one worker |
-  | `idleTimeout` | `600` | Worker shuts down 10 min after last request |
+  | `workersMax` | `1` | At most one worker (set to `0` to disable the endpoint and stop all GPU spend) |
+  | `idleTimeout` | `1800` | Worker shuts down 30 min after last request |
   | `scalerType` | `QUEUE_DELAY` | Scale up when queue delay exceeds threshold |
   | `scalerValue` | `4` | Queue-delay threshold (seconds) |
   | `flashboot` | `true` | Faster cold starts (no extra charge) |
@@ -101,7 +101,11 @@ Install/update (syncs API key file + validates health):
 GUI launches do not inherit shell env; without the key file you get `401 no token provided`.
 See [`docs/opencode-setup.md`](../docs/opencode-setup.md).
 
-`timeout`/`chunkTimeout` are 10min/3min to tolerate cold starts.
+`timeout`/`chunkTimeout` are 30min/7min. RunPod's sync route streams nothing while a
+worker cold-starts, so the whole ~4.5 min cold start counts against `chunkTimeout`; the
+old 3 min value aborted every first-request-after-idle with `SSE read timed out` and
+orphaned the job on the single worker, wedging the endpoint for the retries that
+followed. Guarded by `feature_cold_start_timeout` in `run_tests.sh`.
 
 **Context budget:** `limit.context` (106496) must stay ≤ `MAX_MODEL_LEN − 16384`, and
 `limit.output` stays 32768. opencode only compacts *after* a step crosses
