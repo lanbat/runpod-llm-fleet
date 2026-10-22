@@ -7,8 +7,14 @@
       "options": {
         "baseURL": "https://api.runpod.ai/v2/h8ins1a7nls350/openai/v1",
         "apiKey": "{file:~/.config/envman/RUNPOD.key}",
-        "timeout": 600000,
-        "chunkTimeout": 180000
+        // RunPod's sync route sends no SSE bytes while a scale-to-zero worker cold-starts
+        // (~4.5 min: 31 GB checkpoint download, KV-cache profiling, CUDA graph capture), so
+        // the whole cold start is charged to chunkTimeout. At the old 180000 every first
+        // request after idle aborted with "SSE read timed out" and orphaned its job on the
+        // single worker, so retries stacked up behind it (see features/cold_start_timeout.feature).
+        // 420000 = 5 min cold-start ceiling + 2 min full-context prefill margin.
+        "timeout": 1800000,
+        "chunkTimeout": 420000
       },
       "models": {
         "qwen3.8-27b": {
