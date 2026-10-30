@@ -12,6 +12,7 @@ This repository contains configuration and test suites for LLMs hosted on RunPod
 Each LLM purpose has its own directory under `models/`:
 - `models/coding-agent` - Qwen3.8-27B (official FP8)
 - `models/home-assistant` - Qwen3-8B (AWQ)
+- `models/uncensored-coder` - Huihui Qwen3-Coder-30B-A3B abliterated (FP8 on load)
 
 ## Installation Instructions
 
@@ -65,6 +66,7 @@ cd models/coding-agent
 |---------|-----------|---------------|----------|---------|
 | Coding assistant backend | `models/coding-agent` | Qwen3.8-27B (FP8) | opencode | Scale-to-zero |
 | Home Assistant conversation agent | `models/home-assistant` | Qwen3-8B (AWQ) | Home Assistant | Scale-to-zero |
+| Uncensored coding model | `models/uncensored-coder` | Huihui Qwen3-Coder-30B-A3B abliterated (FP8) | any OpenAI client | Scale-to-zero |
 
 ### Deploy / refresh endpoints
 
