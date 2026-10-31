@@ -1,0 +1,22 @@
+name: check
+
+# The model test suites call live RunPod endpoints, so they run by hand
+# (models/*/run_tests.sh). CI checks what needs no endpoint.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Shellcheck the scripts
+        run: git ls-files -z '*.sh' | xargs -0 shellcheck -S error
+      - name: Validate the JSON files
+        run: git ls-files -z '*.json' | xargs -0 -n1 jq empty
